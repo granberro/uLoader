@@ -36,7 +36,6 @@
 /* Variables */
 static struct _reent fReent;
 
-
 s32 __FAT_GetError(void)
 {
 	/* Return error code */
@@ -47,7 +46,7 @@ s32 __FAT_OpenDir(const char *dirpath, DIR_ITER *dir)
 {
 	DIR_ITER         *result = NULL;
 	DIR_STATE_STRUCT *state  = NULL;
-
+	
 	/* Allocate memory */
 	state = Mem_Alloc(sizeof(DIR_STATE_STRUCT));
 	if (!state)
@@ -88,7 +87,6 @@ void __FAT_CloseDir(DIR_ITER *dir)
 }
 
 FILE_STRUCT *global_fs = NULL;
-#define MAX_FAT_FILES 32
 
 s32 FAT_Open(const char *path, u32 mode)
 {
@@ -105,11 +103,12 @@ s32 FAT_Open(const char *path, u32 mode)
 	/* Clean memory */
 		memset(global_fs, 0, sizeof(FILE_STRUCT)*MAX_FAT_FILES);
 	}
-
+	
 	for(n=0;n<MAX_FAT_FILES;n++)
 	{
 		if(global_fs[n].inUse==0) {fs=&global_fs[n];break;}
 	}
+
 	if (!fs)
 		return ENFILE;
 
@@ -117,45 +116,24 @@ s32 FAT_Open(const char *path, u32 mode)
 	fReent._errno = 0;
 
 	/* Open file */
-	ret = _FAT_open_r(&fReent, fs, path, mode, 0);	
+	ret = _FAT_open_r(&fReent, fs, path, mode, 0);
 	if (ret < 0) {
-		
-		fs->inUse = 0;
 
+		fs->inUse = 0;
 		return __FAT_GetError();
 	}
-
-#if 0
-// NOTE: don't use
-
-	// search for file alredy opened
-	for(n=0;n<MAX_FAT_FILES;n++)
-	{
-		if(global_fs[n].inUse==0 || fs==&global_fs[n]) continue;
-
-		if(global_fs[n].dirEntryStart.cluster==fs->dirEntryStart.cluster && 
-		   global_fs[n].dirEntryStart.sector==fs->dirEntryStart.sector &&
-		   global_fs[n].dirEntryStart.offset==fs->dirEntryStart.offset) break;
-	}
-
-	if(n!=MAX_FAT_FILES) // meec!
-	{
-		_FAT_close_r(&fReent, (s32) fs);//close file
-
-	return FDALREADYOPENED;
-	}
-#endif
 
 	return ret;
 }
 
 s32 FAT_Close(s32 fd)
 {
-s32 ret;
+	s32 ret;
+
 	/* Close file */
 	ret=_FAT_close_r(&fReent, fd);
 
-	return ret;
+	return ret;	
 }
 
 s32 FAT_Read(s32 fd, void *buffer, u32 len)
@@ -164,7 +142,7 @@ s32 FAT_Read(s32 fd, void *buffer, u32 len)
 
 		/* Clear error code */
 		fReent._errno = 0;
-		
+	
 		/* Read file */
 		ret = _FAT_read_r(&fReent, fd, buffer, len);
 		if (ret < 0)

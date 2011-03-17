@@ -35,7 +35,6 @@
 #define IOCTL_ES_LAUNCH	0x08
 
 
-
 extern int flag_emu; // flag emu =0->disable 1->enable
 extern int flag_emu_mode; // 0-> default -> 1 DLC redirected to device:/nand -> 2-> Full emulation
 extern int light_on;
@@ -124,8 +123,29 @@ int ES_ioctlv(ipcmessage *msg)
 {
 	s32 ret = 0;
 	
-	if(verbose_level>2) debug_printf("ES ioctlv in : %x\n",msg->ioctlv.command);
     es_working=1;
+	if(verbose_level>2) debug_printf("ES ioctlv in : %x\n",msg->ioctlv.command);
+	
+// switch(msg->ioctlv.command) {
+	// case 0x09:
+		// {u16 id;
+		// id=*((u16 *) msg->ioctlv.vector[0].data);
+		// debug_printf("Open content id %x\n",id);
+		// break;}
+	// case 0x0A:
+		// {u32 id;
+		// id=*((u32 *) msg->ioctlv.vector[0].data);
+		// debug_printf("Read content id: %d\n",id);		
+		// break;}
+	// case 0x0B:
+		// {u16 id;
+		// id=*((u16 *) msg->ioctlv.vector[0].data);
+		// debug_printf("Close content id: %d\n",id);
+		// break;		}
+
+	// default:
+		// break;
+// }
 	switch(msg->ioctlv.command) {
 	
 	
@@ -157,6 +177,7 @@ int ES_ioctlv(ipcmessage *msg)
 	}
 
 	if(/*ret<0 || */verbose_level>2) debug_printf("ES ioctlv out: %x ret: %i\n",msg->ioctlv.command, ret);
+
 	es_working=0;
 	return ret;
 }

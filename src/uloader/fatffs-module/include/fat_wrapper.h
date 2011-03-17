@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include "types.h"
 
+#define MAX_FAT_FILES 32
+
 /* Filestats structure */
 typedef struct _fstats {
 	u32 file_length;

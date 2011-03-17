@@ -3,10 +3,8 @@
 #include <fcntl.h>
 #include <string.h>
 
+int internal_debug_printf=0;
 
-#define MEM_PRINT 1
-
-#ifdef MEM_PRINT
 
 char mem_cad[32];
 
@@ -15,8 +13,6 @@ char mem_cad[32];
 
 #include "fat.h"
 #include "fat_wrapper.h"
-
-extern int verbose;
 
 void int_char(int num)
 {
@@ -125,9 +121,6 @@ int n,m;
 
 extern s32 index_dev;
 
-//int is_printf=0;
-int internal_debug_printf=0;
-
 static int internal=0;
 void printf_write(int fd, void *data, int len)
 { 
@@ -139,7 +132,6 @@ else
 	os_write(fd, data, len);
 	internal&=1;
 	}
-  // is_printf=0;
 }
 
 
@@ -173,29 +165,33 @@ else
  os_message_queue_receive(queuehandle2, (void *)&message, 0);
 internal=internal_debug_printf;
  
- if(internal & 2) goto salir;
+if(internal & 2) goto salir;
 
  if(index_dev & 1)
 	{
 	
 	if(internal)
-		fd = FAT_Open("usb:/ffs_log.txt" ,O_WRONLY | O_APPEND);
-	else
+			fd = FAT_Open("usb:/ffs_log.txt", O_WRONLY | O_APPEND);
+		else
 		fd=os_open("usb:/ffs_log.txt" ,O_WRONLY | O_APPEND);
-	}
+}
 else
-	{
+{
 	
 	if(internal)
 		fd = FAT_Open("sd:/ffs_log.txt" ,O_WRONLY | O_APPEND);
 	else
-		fd=os_open("sd:/ffs_log.txt" ,O_WRONLY | O_APPEND);
-	}
-
+		fd=os_open("sd:/ffs_log.txt", O_WRONLY | O_APPEND);
+}
+	
 	
 
-	if(fd<0) goto salir;
+if(fd<0) goto salir;
 
+// int_char(fd);
+// printf_write(fd, mem_cad, strlen(mem_cad));
+// printf_write(fd, " ", 1);
+	
  while(format[0])
 	{
 	if(format[0]!='%') {out[0]=*format++; printf_write(fd, out, strlen(out));}
@@ -217,7 +213,6 @@ else
 				val=va_arg(opt, unsigned);
 				uint_char(val);
 				
-				//printf_write(fd, mem_cad, strlen(mem_cad));
 				printf_write(fd, mem_cad, strlen(mem_cad));
 				
 				break;
@@ -244,11 +239,11 @@ else
 if(internal)
 	FAT_Close(fd);
 else
-	os_close(fd);
-
+	os_close(fd);	
+	
 salir:
 	os_message_queue_send(queuehandle2, 0, 0);
 #endif	
 }
-#endif 
+
 

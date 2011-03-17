@@ -55,11 +55,16 @@ static s32  fd = -1;
 
 static u32  sectorSz = 0;
 
+/* Buffers */
+static ioctlv __iovec[3]   ATTRIBUTE_ALIGN(32);
+static u32    __buffer1[1] ATTRIBUTE_ALIGN(32);
+static u32    __buffer2[1] ATTRIBUTE_ALIGN(32);
+
 bool __usbstorage_Read_Write(u32 sector, u32 numSectors, void *buffer, int write)
 {
-	STACK_ALIGN(ioctlv, vector,     3, 32);
-	STACK_ALIGN(u32,   _sector,     1, 32);
-	STACK_ALIGN(u32,   _numSectors, 1, 32);
+	ioctlv *vector = __iovec;
+	u32    *_sector = __buffer1;
+	u32    *_numSectors = __buffer2;	
 
 	u32 cnt, len = (sectorSz * numSectors);
 	s32 ret;
@@ -118,8 +123,8 @@ bool __usbstorage_Write(u32 sector, u32 numSectors, void *buffer)
 
 s32 __usbstorage_GetCapacity(u32 *_sectorSz)
 {
-	STACK_ALIGN(ioctlv, vector, 1, 32);
-	STACK_ALIGN(u32,    buffer, 1, 32);
+	ioctlv *vector = __iovec;
+	u32    *buffer = __buffer1;	
 
 	if (fd >= 0) {
 		s32 ret;

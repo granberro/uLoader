@@ -95,7 +95,7 @@ enum BPB {
 };
 
 static const char FAT_SIG[3] = {'F', 'A', 'T'};
-
+static const devoptab_t *devops;
 
 PARTITION* _FAT_partition_constructor (const DISC_INTERFACE* disc, uint32_t cacheSize, sec_t startSector) {
 	PARTITION* partition;
@@ -319,9 +319,10 @@ void _FAT_partition_destructor (PARTITION* partition) {
 extern const devoptab_t* My_GetDeviceOpTab (const char *name);
 
 PARTITION* _FAT_partition_getPartitionFromPath (const char* path) {
-	const devoptab_t *devops;
-	
-	devops = My_GetDeviceOpTab (path);
+
+	if (!devops) {
+		devops = My_GetDeviceOpTab (path);
+	}
 	
 	if (!devops) {
 		return NULL;

@@ -58,8 +58,8 @@ CACHE* _FAT_cache_constructor (sec_t FATstart, unsigned int numberOfPages, unsig
 		numberOfPages = 2;
 	}
 
-	if (sectorsPerPage < 4) {
-		sectorsPerPage = 4;
+	if (sectorsPerPage < 8) {
+		sectorsPerPage = 8;
 	}
 
 	cache = (CACHE*) _FAT_mem_allocate (sizeof(CACHE));

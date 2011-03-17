@@ -47,10 +47,10 @@ int flag_emu_mode=0; // 0-> default -> 1 DLC redirected to device:/nand -> 2-> F
 int light_on=1;
 int verbose_level=0;
 int diary_mode=0;
-
+int game_loading = 1;
 int usb_mounted=-1;
 int sd_mounted=-1;
-
+int game=0;
 s32 index_dev=0;
 
 const char dev_names[8][12]=
@@ -151,16 +151,70 @@ int n;
 	}
 
 	if(disable_ffs)
-		{
+	{
 		if(flag_no_mload && !cmp_string(name,"fat"))
-			{
+		{
 			return dev_kk;
-			}
 		}
-
+	}
 
 	if(!flag_emu || disable_ffs) 
 		return name;
+	
+	if (game_loading && !cmp_string(name, "/title/00010000/535a4145/data/rockbnd2.dat")) {
+		game_loading=0;
+		game = 2; // RB2
+	}
+	
+	if (game_loading && !cmp_string(name, "/title/00010000/535a4245/data/band3.dat")) {
+		game_loading=0;
+		game = 3; // RB3		
+	}
+	
+	// if (game_loading && !cmp_string(name, "/ticket/00010005/735a4a45.tik")) {
+		// game_loading=0;
+		// game = 3; // RB3
+	// }
+	
+	// Avoid nand emulation during game load
+	if (game_loading && 
+		(!cmp_string(name, "/title/00010005") || !cmp_string(name, "/ticket/00010005"))) {
+			return "/ticket/00010005/00000000.tik";
+	}
+
+	if (game == 2) {
+		// Avoid looking for non existant files
+		if (!cmp_string(name, "/ticket/00010005")) {
+			if (!cmp_string(name, "/ticket/00010005/735a4145.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4245.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4345.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4445.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4545.tik")) {
+			}
+			else {
+				return "/ticket/00010005/00000000.tik";
+			}			
+		}	
+	}
+	
+	if (game == 3) {
+		// Avoid looking for non existant files
+		if (!cmp_string(name, "/ticket/00010005")) {
+			if (!cmp_string(name, "/ticket/00010005/735a4145.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4245.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4345.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4445.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4545.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4a45.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4b45.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4c45.tik")) {
+			}
+			else {
+				return "/ticket/00010005/00000000.tik";
+			}			
+		}	
+	}	
+
 
 	if(name[0]=='#') // for example #/title/xxxx : can be used to skip this function to open files
 		{
@@ -453,6 +507,10 @@ s32 __FAT_Ioctlv(ipcmessage *message)
 	for (cnt = 0; cnt < (len_in + len_io); cnt++)
 		os_sync_before_read(vector[cnt].data, vector[cnt].len);
 
+// internal_debug_printf=1;
+// if(verbose_level) debug_printf("ioctl_fat_cmd %x\n", message->ioctlv.command);
+// internal_debug_printf=0;
+		
 	/* Parse IOCTLV command */
 	switch (message->ioctlv.command) {
 	/** Open file **/
@@ -793,7 +851,7 @@ s32 __FAT_Ioctlv(ipcmessage *message)
 		while(1) {swi_mload_led_on();Timer_Sleep(5000*1000);swi_mload_led_off();Timer_Sleep(1000*1000);}
 		break;
 	}
-
+	
 	/* Flush cache */
 	for (cnt = 0; cnt < (len_in + len_io); cnt++)
 		os_sync_after_write(vector[cnt].data, vector[cnt].len);
@@ -841,14 +899,14 @@ s32 __FAT_Initialize(u32 *queuehandle)
 
 
 // fd used to emulate NAND files 
-static int ffs_fat_fd[32]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+static int ffs_fat_fd[MAX_FAT_FILES]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 
 
 static int ffs_get_first_fd(void)
 {
 int n;
 
-	for(n=0;n<32;n++) if(ffs_fat_fd[n]==-1) return n;
+	for(n=0;n<MAX_FAT_FILES;n++) if(ffs_fat_fd[n]==-1) return n;
 
 return -6;
 }
@@ -857,7 +915,7 @@ static inline int get_fat_fd(int fd)
 {
 int n;
 
-	for(n=0;n<32;n++) if(ffs_fat_fd[n]==fd) return n;
+	for(n=0;n<MAX_FAT_FILES;n++) if(ffs_fat_fd[n]==fd) return n;
 
 return -6;
 }
@@ -892,34 +950,33 @@ int n;
 
 	if(!disable_ffs) {
 
-	for(n=0;n<32;n++) {if(ffs_fat_fd[n]>=0) FAT_Close(ffs_fat_fd[n]); ffs_fat_fd[n]=-1;}
+		for(n=0;n<MAX_FAT_FILES;n++) {if(ffs_fat_fd[n]>=0) FAT_Close(ffs_fat_fd[n]); ffs_fat_fd[n]=-1;}
 
-	if(sd_mounted>0)
+		if(sd_mounted>0)
 		{
-		/* Unmount SD card */
-		fatUnmount("sd");
-		sd_mounted=0;
+			/* Unmount SD card */
+			fatUnmount("sd");
+			sd_mounted=0;
 		}
-	if(sd_mounted==0)
+		if(sd_mounted==0)
 		{
-		/* Deinitialize SDIO */
-		__io_wiisd.shutdown();
-		sd_mounted=-1;
-		}
-
-	if(usb_mounted>0)
-		{
-		/* Unmount USB */
-		fatUnmount("usb");
-		usb_mounted=0;
-		}
-	if(usb_mounted==0)
-		{
-		/* Deinitialize USB */
-		__io_usbstorage.shutdown();
-		usb_mounted=-1;
+			/* Deinitialize SDIO */
+			__io_wiisd.shutdown();
+			sd_mounted=-1;
 		}
 
+		if(usb_mounted>0)
+		{
+			/* Unmount USB */
+			fatUnmount("usb");
+			usb_mounted=0;
+		}
+		if(usb_mounted==0)
+		{
+			/* Deinitialize USB */
+			__io_usbstorage.shutdown();
+			usb_mounted=-1;
+		}
 	}
 
 	for(n=0;n<2;n++) {swi_mload_led_on();Timer_Sleep(300*1000);swi_mload_led_off();Timer_Sleep(300*1000);}
@@ -1061,7 +1118,7 @@ int main(void)
 
 	/* Main loop */
 	while (1) {
-		char *p, *p2, use_light=0;
+		char *p, *p2, nand_file=0;
 		ipcmessage *message = NULL;
 		volatile int res;
 
@@ -1099,7 +1156,7 @@ int main(void)
 		case IOS_OPEN: {
 			char *devpath = message->open.device;
 			u32   mode    = message->open.mode;
-
+			int n = -1;
 			
 			memcpy(path_name, (char *) message->open.device, strlen((char *) message->open.device)+1);
 			devpath=path_name;
@@ -1135,7 +1192,7 @@ int main(void)
 				break;
 				}
 			
-			use_light=0;
+			nand_file=0;
             p=p2=NULL;
 
 			/* Open file */
@@ -1144,9 +1201,7 @@ int main(void)
 			{
 
 				if(sd_mounted<0) {ret=-102;break;}
-				use_light=1; // for lighting when it read or write
-				
-				//mode=2; // force flag for read/write only 
+				nand_file=1; // for lighting when it read or write
 
 			}
 
@@ -1154,28 +1209,26 @@ int main(void)
 			{
 
 				if(usb_mounted<0) {ret=-102;break;}
-				use_light=1; // for lighting when it read or write
+				nand_file=1; // for lighting when it read or write
 				
-				//mode=2; // force flag for read/write only 
-
 			}
 
 			ret = FAT_Open(devpath, mode);
 			
 			// for lighting when it read or write
-			if(ret>=0 && use_light)
-				{
-				int n;
+			if(ret>=0 && nand_file)
+			{
 					
-					n=ffs_get_first_fd();
-					if(n>=0) ffs_fat_fd[n]=ret;
-				}
-			if(use_light)
-				{
+				n=ffs_get_first_fd();
+				if(n>=0) ffs_fat_fd[n]=ret;
+			}
+			
+			if(nand_file)
+			{
 				internal_debug_printf=1;
-				if(verbose_level) debug_printf("FAT open ret %i %s\n",ret, devpath);
+				if(verbose_level) debug_printf("ios_open file %s n %d\n", devpath, n);
 				internal_debug_printf=0;
-				}
+			}
 			break;
 		}
 
@@ -1194,7 +1247,11 @@ int main(void)
 			/* Close file */
 			ret = FAT_Close(message->fd);
 			
-
+			// if (n>=0) {
+				// internal_debug_printf=1;
+				// if (verbose_level) debug_printf("ios_close n %d ret %d\n", n, ret);
+				// internal_debug_printf=0;
+			// }
 			break;
 		}
 
@@ -1202,37 +1259,41 @@ int main(void)
 			void *buffer = message->read.data;
 			u32   len    = message->read.length;
             int n;
-			
+		
 			if(message->fd==0x888) // /dev/stm/immediate descriptor
 			{
 				ret=-101;
 				break;
 			}
+			
 
 			/* Read file */
 			os_sync_before_read(buffer, len);
 
 			n=get_fat_fd(message->fd);
 			
-			//if(n>=0 && light_on ) swi_mload_led_on();
 
-			if(n>=0 && (light_on & 2)) led_on();
+//			if(n>=0 && (light_on & 2)) led_on();
 
 			ret = FAT_Read(message->fd, buffer, len);
 
-			if(n>=0 && (light_on & 2)) led_off();
+//			if(n>=0 && (light_on & 2)) led_off();
 
-
+		
 			if(ret<0)
 			{
 				internal_debug_printf=1;
-				if(verbose_level) debug_printf("Err FAT Read ret %i len i \n",ret, len );
+				if(verbose_level) debug_printf("Err FAT Read fd %d ret %d len %d \n",message->fd, ret, len );
 				internal_debug_printf=0;
 			}
-			memcpy(buffer, buffer, len);
-			/* Flush cache */
-			os_sync_after_write(buffer, len);
+			else
+			{
+				//memcpy(buffer, buffer, len);
+				/* Flush cache */
+				os_sync_after_write(buffer, len);
+				ret = len;
 
+			}
 
 			break;
 		}
@@ -1253,12 +1314,12 @@ int main(void)
 			
 			n=get_fat_fd(message->fd);
 			
-			if(n>=0 && light_on  ) led_on(); //swi_mload_led_on();
+			// if(n>=0 && light_on  ) led_on(); //swi_mload_led_on();
 
 			/* Write file */
 			ret = FAT_Write(message->fd, buffer, len);
 
-			if(n>=0 && light_on) led_off();//swi_mload_led_off();
+			// if(n>=0 && light_on) led_off();//swi_mload_led_off();
 
 
 			break;
@@ -1282,8 +1343,7 @@ int main(void)
 				if(verbose_level) debug_printf("Err FAT Seek ret %i %u %u \n",ret, where, whence );
 				internal_debug_printf=0;
 			}
-
-
+			
 			break;
 		}
 
@@ -1299,9 +1359,10 @@ int main(void)
 				{
 				ret=-101;
 				internal_debug_printf=1;
-				if(verbose_level) debug_printf("eh! you cannot call ioctlv %x from here!\n", message->ioctlv.command);
+				if(verbose_level) debug_printf("eh! you cannot call ioctlv %x from here! fd %d\n", message->ioctlv.command,message->fd );
 				internal_debug_printf=0;
-			    while(1) {swi_mload_led_on();Timer_Sleep(5000*1000);swi_mload_led_off();Timer_Sleep(1000*1000);}
+			    //while(1)
+				{swi_mload_led_on();Timer_Sleep(5000*1000);swi_mload_led_off();Timer_Sleep(1000*1000);}
 				}
 			else
 				/* Parse IOCTLV message */
@@ -1336,8 +1397,8 @@ int main(void)
 				static fstats my_stats ATTRIBUTE_ALIGN(32);
 				fstats *stats = (fstats *) message->ioctl.buffer_io;
 				u32     fd    = message->fd;
-				
-				if(get_fat_fd(message->fd)>=0) 
+				int n = get_fat_fd(message->fd);
+				if(n>=0) 
 					{
 					/* Get file stats */
 					ret = FAT_GetFileStats(fd, &my_stats);
@@ -1348,19 +1409,20 @@ int main(void)
 						}
 
 					internal_debug_printf=1;
-					if(verbose_level) debug_printf("FAT GetFileStats ret %i %u %u \n",ret, my_stats.file_length, my_stats.file_pos );
+					if(verbose_level) debug_printf("FAT GetFileStats fd %d ret %d %u %u n %d\n",message->fd ,ret, my_stats.file_length, my_stats.file_pos , n);
 					internal_debug_printf=0;
 					}
-				else ret=-106;
-			
+				else
+					ret=-106;
 			    }
 			 else
 				{
 				ret=-101;
 				internal_debug_printf=1;
-				if(verbose_level) debug_printf("eh! you cannot call ioctl 0x from here!\n", message->ioctl.command);
+				if(verbose_level) debug_printf("eh! you cannot call ioctl %x from here!\n", message->ioctl.command);
 				internal_debug_printf=0;
-			    while(1) {swi_mload_led_on();Timer_Sleep(5000*1000);swi_mload_led_off();Timer_Sleep(1000*1000);}
+			    //while(1)
+				{swi_mload_led_on();Timer_Sleep(5000*1000);swi_mload_led_off();Timer_Sleep(1000*1000);}
 				}
 			break;
 			}

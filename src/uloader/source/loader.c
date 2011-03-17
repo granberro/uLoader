@@ -1099,6 +1099,7 @@ int load_disc(u8 *discid)
 		 The rest of paths works in the NAND
 		*/
         
+		//if((nand_mode & 3) || dont_use_diary) enable_ffs( ((nand_mode-1) & 1) | ((nand_mode>>1) & 6) | 8 | 16 | 32 | (64*(dont_use_diary!=0)) | 128 | (256* ((nand_mode & 16)!=0)));
 		if((nand_mode & 3) || dont_use_diary) enable_ffs( ((nand_mode-1) & 1) | ((nand_mode>>1) & 6) | 8 | (64*(dont_use_diary!=0)) | 128 | (256* ((nand_mode & 16)!=0)));
 		
 		// mounting FFS system
