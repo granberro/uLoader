@@ -40,7 +40,7 @@ os_thread_stop:
 
 	.code 32
 	.global os_thread_yield
-os_thread_yiel:
+os_thread_yield:
 	syscall 0x7
 
 	.code 32

@@ -47,10 +47,11 @@ int flag_emu_mode=0; // 0-> default -> 1 DLC redirected to device:/nand -> 2-> F
 int light_on=1;
 int verbose_level=0;
 int diary_mode=0;
-int game_loading = 1;
+int game_loading=1;
 int usb_mounted=-1;
 int sd_mounted=-1;
 int game=0;
+int trimed_tmd=0;
 s32 index_dev=0;
 
 const char dev_names[8][12]=
@@ -161,29 +162,27 @@ int n;
 	if(!flag_emu || disable_ffs) 
 		return name;
 	
+	// RB game identification
+	if (game == 0) {
+		if (!cmp_string(name, "/title/00010000/535a4145"))
+			game = 2; // RB2	
+		if (!cmp_string(name, "/title/00010000/535a4245"))
+			game = 3; // RB3		
+	}	
+	
+	// It's time to use emulated files for RB2
 	if (game_loading && !cmp_string(name, "/title/00010000/535a4145/data/rockbnd2.dat")) {
 		game_loading=0;
-		game = 2; // RB2
 	}
 	
-	if (game_loading && !cmp_string(name, "/title/00010000/535a4245/data/band3.dat")) {
-		game_loading=0;
-		game = 3; // RB3		
-	}
-	
-	// if (game_loading && !cmp_string(name, "/ticket/00010005/735a4a45.tik")) {
-		// game_loading=0;
-		// game = 3; // RB3
-	// }
-	
-	// Avoid nand emulation during game load
-	if (game_loading && 
+	// Avoid nand emulation during game loading (RB2)
+	if (game_loading && game == 2 &&
 		(!cmp_string(name, "/title/00010005") || !cmp_string(name, "/ticket/00010005"))) {
 			return "/ticket/00010005/00000000.tik";
 	}
 
-	if (game == 2) {
-		// Avoid looking for non existant files
+	// Avoid looking for non existant files
+	if (game == 2) {		
 		if (!cmp_string(name, "/ticket/00010005")) {
 			if (!cmp_string(name, "/ticket/00010005/735a4145.tik") ||
 				!cmp_string(name, "/ticket/00010005/735a4245.tik") ||
@@ -191,14 +190,13 @@ int n;
 				!cmp_string(name, "/ticket/00010005/735a4445.tik") ||
 				!cmp_string(name, "/ticket/00010005/735a4545.tik")) {
 			}
-			else {
+			else
 				return "/ticket/00010005/00000000.tik";
-			}			
 		}	
 	}
 	
-	if (game == 3) {
-		// Avoid looking for non existant files
+	// Avoid looking for non existant files
+	if (game == 3) {		
 		if (!cmp_string(name, "/ticket/00010005")) {
 			if (!cmp_string(name, "/ticket/00010005/735a4145.tik") ||
 				!cmp_string(name, "/ticket/00010005/735a4245.tik") ||
@@ -207,13 +205,13 @@ int n;
 				!cmp_string(name, "/ticket/00010005/735a4545.tik") ||
 				!cmp_string(name, "/ticket/00010005/735a4a45.tik") ||
 				!cmp_string(name, "/ticket/00010005/735a4b45.tik") ||
-				!cmp_string(name, "/ticket/00010005/735a4c45.tik")) {
+				!cmp_string(name, "/ticket/00010005/735a4c45.tik") ||
+				!cmp_string(name, "/ticket/00010005/735a4d45.tik")) {
 			}
-			else {
+			else
 				return "/ticket/00010005/00000000.tik";
-			}			
 		}	
-	}	
+	}
 
 
 	if(name[0]=='#') // for example #/title/xxxx : can be used to skip this function to open files
@@ -249,7 +247,7 @@ int n;
 	else
 
 	if(!test_string(name)) // redirect some routes
-		{
+	{
 		int m;
 		int ind=index_dev;
 		
@@ -263,9 +261,22 @@ int n;
 		for(n=0;name[n];n++) sys_name[n+m]=name[n];
 		sys_name[n+m]=0;
 
+		// Use trimmed tmd file for RB2 title.tmd2
+		if (game == 2  && !cmp_string(name, "title/00010005") && strstr(name, "/content/title.tmd" )) {
+			sys_name[n+m]='2';
+			sys_name[n+m+1]=0;
+		}
+		
+		// Use trimmed tmd file for RB3 title.tmd3 where appropiate
+		if (game == 3 && trimed_tmd
+			&& !cmp_string(name, "title/00010005") && strstr(name, "/content/title.tmd" )) {
+			sys_name[n+m]='3';
+			sys_name[n+m+1]=0;
+		}
+		
 		name=(char *) sys_name;
 		syscall_open_mode=2;
-		}
+	}
 
 
 return name;
@@ -1226,7 +1237,7 @@ int main(void)
 			if(nand_file)
 			{
 				internal_debug_printf=1;
-				if(verbose_level) debug_printf("ios_open file %s n %d\n", devpath, n);
+				if(verbose_level) debug_printf("ios_open file %s n %d \n", devpath, n);
 				internal_debug_printf=0;
 			}
 			break;
@@ -1256,7 +1267,7 @@ int main(void)
 		}
 
 		case IOS_READ: {
-			void *buffer = message->read.data;
+			unsigned char *buffer = (unsigned char *)message->read.data;
 			u32   len    = message->read.length;
             int n;
 		
@@ -1265,21 +1276,12 @@ int main(void)
 				ret=-101;
 				break;
 			}
-			
 
 			/* Read file */
 			os_sync_before_read(buffer, len);
-
-			n=get_fat_fd(message->fd);
 			
-
-//			if(n>=0 && (light_on & 2)) led_on();
-
 			ret = FAT_Read(message->fd, buffer, len);
 
-//			if(n>=0 && (light_on & 2)) led_off();
-
-		
 			if(ret<0)
 			{
 				internal_debug_printf=1;
@@ -1288,11 +1290,53 @@ int main(void)
 			}
 			else
 			{
-				//memcpy(buffer, buffer, len);
 				/* Flush cache */
 				os_sync_after_write(buffer, len);
-				ret = len;
 
+				// Nasty workaround. It seems there some issue with multithread and IOS memory sharing (RB3)
+				// Force ending bytes of songs.dta file
+				if (game==3 && ret!=len) {
+					
+					if (verbose_level) {
+						internal_debug_printf=1;
+						debug_printf("Len %d Ret %d\n",len, ret);
+						if(buffer[0] !='(') debug_printf("Opps not what expected! %x\n",buffer[0]);
+						debug_printf("Fat Read\n");
+						for (n=0; n<16; n++) 
+							debug_printf("%x ",buffer[ret-16+n]);
+						debug_printf("\n");
+						internal_debug_printf=0;
+					}
+		
+					int m=1;
+					while (buffer[ret-m]!=0x29 && m <16)
+						m++;
+		
+					int count=1;
+					while (count>0) {		
+						count = 0;
+						for (n=1;n<m; n=n+2) {			
+							buffer[ret-n]=0x0a;
+							buffer[ret-n-1]=0x0d;
+						}
+						
+						os_thread_yield();
+						
+						for (n=1;n<m; n=n+2) {
+							if (buffer[ret-n]!=0x0a) count++;
+							if (buffer[ret-n-1]!=0x0d) count++;
+						}
+						
+						if(verbose_level) {
+							internal_debug_printf=1;
+							debug_printf("Fat Corregido\n");
+							for (n=0; n<16; n++) 
+								debug_printf("%x ",buffer[ret-16+n]);
+							debug_printf("\n");
+							internal_debug_printf=0;
+						}
+					}
+				}
 			}
 
 			break;
@@ -1301,7 +1345,6 @@ int main(void)
 		case IOS_WRITE: {
 			void *buffer = message->write.data;
 			u32   len    = message->write.length;
-			int n;
 
 			if(message->fd==0x888) // /dev/stm/immediate descriptor
 			{
@@ -1312,15 +1355,8 @@ int main(void)
 			/* Invalidate cache */
 			os_sync_before_read(buffer, len);
 			
-			n=get_fat_fd(message->fd);
-			
-			// if(n>=0 && light_on  ) led_on(); //swi_mload_led_on();
-
 			/* Write file */
 			ret = FAT_Write(message->fd, buffer, len);
-
-			// if(n>=0 && light_on) led_off();//swi_mload_led_off();
-
 
 			break;
 		}

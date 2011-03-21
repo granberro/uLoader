@@ -12,6 +12,7 @@ void  os_thread_set_priority(s32 id, u32 priority);
 s32   os_thread_get_priority(void);
 s32   os_get_thread_id(void);
 s32   os_get_parent_thread_id(void);
+s32   os_thread_yield(void);
 s32   os_thread_continue(s32 id);
 s32   os_thread_stop(s32 id);
 s32   os_message_queue_create(void *ptr, u32 id);

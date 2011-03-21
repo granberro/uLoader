@@ -40,6 +40,7 @@ extern int flag_emu_mode; // 0-> default -> 1 DLC redirected to device:/nand -> 
 extern int light_on;
 extern int verbose_level;
 extern int diary_mode;
+extern int trimed_tmd;
 
 void led_on(void);
 void led_off(void);
@@ -126,7 +127,12 @@ int ES_ioctlv(ipcmessage *msg)
     es_working=1;
 	if(verbose_level>2) debug_printf("ES ioctlv in : %x\n",msg->ioctlv.command);
 	
-// switch(msg->ioctlv.command) {
+ // switch(msg->ioctlv.command) {
+	// case 0x24:
+		// {u16 id;
+		// id=*((u16 *) msg->ioctlv.vector[2].data);
+		// debug_printf("Open content id %x\n",id);
+		// break;} 
 	// case 0x09:
 		// {u16 id;
 		// id=*((u16 *) msg->ioctlv.vector[0].data);
@@ -135,7 +141,7 @@ int ES_ioctlv(ipcmessage *msg)
 	// case 0x0A:
 		// {u32 id;
 		// id=*((u32 *) msg->ioctlv.vector[0].data);
-		// debug_printf("Read content id: %d\n",id);		
+		// debug_printf("Read content id: %d aligned %d\n",id, (((u32)msg->read.data)&0x1F));
 		// break;}
 	// case 0x0B:
 		// {u16 id;
@@ -143,7 +149,7 @@ int ES_ioctlv(ipcmessage *msg)
 		// debug_printf("Close content id: %d\n",id);
 		// break;		}
 
-	// default:
+	 // default:
 		// break;
 // }
 	switch(msg->ioctlv.command) {
@@ -170,14 +176,30 @@ int ES_ioctlv(ipcmessage *msg)
 		goto original_ioctlv;
 
 		}
+	case 0x10:
+	case 0x11:
+		{
+			trimed_tmd=1;
+			goto original_ioctlv;
+		}
 
 	default:
 	original_ioctlv:
 		ret = out_ES_ioctlv(msg);
 	}
 
+	trimed_tmd=0;
 	if(/*ret<0 || */verbose_level>2) debug_printf("ES ioctlv out: %x ret: %i\n",msg->ioctlv.command, ret);
 
+// switch(msg->ioctlv.command) {
+	// case 0x0A:
+		// {
+		// debug_printf("Result %x, fd %x read %d in %d out %d\n",msg->result, msg->fd, msg->read.data, msg->ioctlv.num_in, msg->ioctlv.num_io);
+		// break;}
+	// default:
+		// break;
+// }	
+	
 	es_working=0;
 	return ret;
 }
