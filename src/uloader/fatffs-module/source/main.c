@@ -53,6 +53,7 @@ int sd_mounted=-1;
 int game=0;
 int trimed_tmd=0;
 s32 index_dev=0;
+const char chunk[8] = { 0x29, 0x0d, 0x0a, 0x29, 0x0d, 0x0a, 0x0d, 0x0a };
 
 const char dev_names[8][12]=
 {
@@ -1293,7 +1294,7 @@ int main(void)
 				/* Flush cache */
 				os_sync_after_write(buffer, len);
 
-				// Nasty workaround. It seems there some issue with multithread and IOS memory sharing (RB3)
+				// Nasty workaround. It seems there are an issue with multithread and IOS memory sharing (RB3)
 				// Force ending bytes of songs.dta file
 				if (game==3 && ret!=len) {
 					
@@ -1307,35 +1308,28 @@ int main(void)
 						debug_printf("\n");
 						internal_debug_printf=0;
 					}
-		
-					int m=1;
-					while (buffer[ret-m]!=0x29 && m <16)
+					
+					// Find end of word 'points'
+					int m=0;
+					while (buffer[ret-16+m]!=0x73)
 						m++;
-		
-					int count=1;
-					while (count>0) {		
-						count = 0;
-						for (n=1;n<m; n=n+2) {			
-							buffer[ret-n]=0x0a;
-							buffer[ret-n-1]=0x0d;
-						}
-						
-						os_thread_yield();
-						
-						for (n=1;n<m; n=n+2) {
-							if (buffer[ret-n]!=0x0a) count++;
-							if (buffer[ret-n-1]!=0x0d) count++;
-						}
-						
-						if(verbose_level) {
-							internal_debug_printf=1;
-							debug_printf("Fat Corregido\n");
-							for (n=0; n<16; n++) 
-								debug_printf("%x ",buffer[ret-16+n]);
-							debug_printf("\n");
-							internal_debug_printf=0;
-						}
+			
+
+					for (n=8+m;n<16;n++) {
+						if (buffer[ret-16+n] != chunk[n-8])
+							buffer[ret-16+n] = chunk[n-8];
 					}
+						
+					os_thread_yield();
+						
+					if(verbose_level) {
+						internal_debug_printf=1;
+						debug_printf("Fat Corregido\n");
+						for (n=0; n<16; n++) 
+							debug_printf("%x ",buffer[ret-16+n]);
+						debug_printf("\n");
+						internal_debug_printf=0;
+					}					
 				}
 			}
 
